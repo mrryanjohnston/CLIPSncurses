@@ -49,7 +49,7 @@
         ">")))
 
   (ncurses-refresh)
-  (assert (key (ch (ncurses-getch)))))
+  (assert (key (ch (ncurses-key-to-str (ncurses-getch))))))
 
 ; ------------------------------------------------------------
 ; navigation
@@ -123,7 +123,7 @@
   (ncurses-mvprintw 4 2 "Starting the game...")
   (ncurses-mvprintw 4 4 "Press any key to return")
   (ncurses-refresh)
-  (assert (key (ch (ncurses-getch)))))
+  (assert (key (ch (ncurses-key-to-str (ncurses-getch))))))
 
 (defrule leave-start
   ?k <- (key)
@@ -147,7 +147,7 @@
   (ncurses-mvprintw 4 4 (str-cat "Difficulty: " ?d))
   (ncurses-mvprintw 4 6 "Press any key to return")
   (ncurses-refresh)
-  (assert (key (ch (ncurses-getch)))))
+  (assert (key (ch (ncurses-key-to-str (ncurses-getch))))))
 
 (defrule leave-options
   ?k <- (key)
@@ -169,7 +169,7 @@
   (ncurses-mvprintw 4 4 "Enter selects.")
   (ncurses-mvprintw 4 6 "Press any key to return.")
   (ncurses-refresh)
-  (assert (key (ch (ncurses-getch)))))
+  (assert (key (ch (ncurses-key-to-str (ncurses-getch))))))
 
 (defrule leave-help
   ?k <- (key)
@@ -186,7 +186,7 @@
   ?k <- (key)
   =>
   (retract ?k)
-  (assert (key (ch (ncurses-getch)))))
+  (assert (key (ch (ncurses-key-to-str (ncurses-getch))))))
 
 ; ------------------------------------------------------------
 ; bootstrap

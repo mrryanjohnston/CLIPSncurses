@@ -1,3 +1,4 @@
+(watch all)
 ; ============================================================
 ; ncurses dashboard demo — window-based, declarative
 ; ============================================================
@@ -34,7 +35,7 @@
 (deffacts startup
   (app (focus menu) (dirty TRUE))
   (menu (index 0)
-        (items "Run" "Inspect: Facts" "Inspect: Rules" "Help" "Quit"))
+        (items "Run" "Inspect: Facts" "Inspect: Rules" "Inspect: Agenda" "Help" "Quit"))
   (inspect (tab facts))
   (status (msg "↑↓ move  Tab focus  Enter select  i tab  q quit")))
 
@@ -261,6 +262,36 @@
   (modify ?ins (tab rules))
   (modify ?a (dirty TRUE)))
 
+(defrule menu-select-inspect-agenda
+  ?a <- (app (focus menu))
+  ?k <- (key (ch 10))
+  (menu (index ?index) (items $?items))
+  ?ins <- (inspect)
+  ?me <- (menu-rendered)
+  ?ma <- (main-rendered)
+  ?i <- (inspect-rendered)
+  ?s <- (status-rendered)
+  (test (eq (nth$ (+ 1 ?index) ?items) "Inspect: Agenda"))
+  =>
+  (retract ?k ?me ?ma ?i ?s)
+  (modify ?ins (tab agenda))
+  (modify ?a (dirty TRUE)))
+
+(defrule menu-select-inspect-quit
+  ?a <- (app (focus menu))
+  ?k <- (key (ch 10))
+  (menu (index ?index) (items $?items))
+  ?ins <- (inspect)
+  ?me <- (menu-rendered)
+  ?ma <- (main-rendered)
+  ?i <- (inspect-rendered)
+  ?s <- (status-rendered)
+  (test (eq (nth$ (+ 1 ?index) ?items) "Quit"))
+  =>
+  (retract ?k)
+  (ncurses-endwin)
+  (exit))
+
 (defrule menu-select-quit
   ?k <- (key (ch q))
   =>
@@ -276,7 +307,8 @@
   ?a <- (app (dirty FALSE))
   ?k <- (key (ch ~9&~10&~KEY_DOWN&~KEY_UP))
   =>
-  (retract ?k))
+  (retract ?k)
+  (modify ?a (dirty TRUE)))
 
 ; ------------------------------------------------------------
 ; bootstrap

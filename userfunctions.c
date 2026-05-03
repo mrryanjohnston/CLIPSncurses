@@ -53,6 +53,9 @@
 
 void UserFunctions(Environment *);
 
+// Normally the first function call in an ncurses program.
+// Used to initialize the library
+// and set up the terminal for screen manipulation.
 void NcursesinitscrFunction(Environment *theEnv, UDFContext *context, UDFValue *returnValue)
 {
 	returnValue->externalAddressValue = CreateCExternalAddress(theEnv, (void*)initscr());
@@ -79,12 +82,19 @@ void Ncurses##FUNCTION_NAME##Function(Environment *theEnv, UDFContext *context, 
 	HANDLE_OK_OR_ERR(FUNCTION_NAME, FUNCTION_NAME()); \
 }
 
+HANDLE_OK_OR_ERR_FUNCTION(echo)
 HANDLE_OK_OR_ERR_FUNCTION(noecho)
 HANDLE_OK_OR_ERR_FUNCTION(cbreak)
+HANDLE_OK_OR_ERR_FUNCTION(nocbreak)
 HANDLE_OK_OR_ERR_FUNCTION(clear)
 HANDLE_OK_OR_ERR_FUNCTION(refresh)
 HANDLE_OK_OR_ERR_FUNCTION(endwin)
 HANDLE_OK_OR_ERR_FUNCTION(doupdate)
+
+void Ncursesstart_colorFunction(Environment *theEnv, UDFContext *context, UDFValue *returnValue)
+{
+	HANDLE_OK_OR_ERR("start_color", start_color());
+}
 
 #define SET_OPTION(FUNCTION_NAME) \
 void Ncurses##FUNCTION_NAME##Function(Environment *theEnv, UDFContext *context, UDFValue *returnValue) \
@@ -617,13 +627,140 @@ chtype StrToACS(const char *str)
 	}
 }
 
+int StrToAttr(const char *str)
+{
+	if (0 == strcmp(str, "A_NORMAL"))
+	{
+		return A_NORMAL;
+	}
+	else
+	if (0 == strcmp(str, "A_STANDOUT"))
+	{
+		return A_STANDOUT;
+	}
+	else
+	if (0 == strcmp(str, "A_UNDERLINE"))
+	{
+		return A_UNDERLINE;
+	}
+	else
+	if (0 == strcmp(str, "A_REVERSE"))
+	{
+		return A_REVERSE;
+	}
+	else
+	if (0 == strcmp(str, "A_BLINK"))
+	{
+		return A_BLINK;
+	}
+	else
+	if (0 == strcmp(str, "A_DIM"))
+	{
+		return A_DIM;
+	}
+	else
+	if (0 == strcmp(str, "A_BOLD"))
+	{
+		return A_BOLD;
+	}
+	else
+	if (0 == strcmp(str, "A_PROTECT"))
+	{
+		return A_PROTECT;
+	}
+	else
+	if (0 == strcmp(str, "A_INVIS"))
+	{
+	return A_INVIS;
+	}
+	else
+	if (0 == strcmp(str, "A_ALTCHARSET"))
+	{
+		return A_ALTCHARSET;
+	}
+	else
+	if (0 == strcmp(str, "A_ITALIC"))
+	{
+		return A_ITALIC;
+	}
+	else
+	if (0 == strcmp(str, "A_ATTRIBUTES"))
+	{
+		return A_ATTRIBUTES;
+	}
+	else
+	if (0 == strcmp(str, "A_CHARTEXT"))
+	{
+		return A_CHARTEXT;
+	}
+	else
+	if (0 == strcmp(str, "A_COLOR"))
+	{
+		return A_COLOR;
+	}
+	else
+	{
+		return -1;
+	}
+}
+
+int StrToAdditionalAttr(const char *str)
+{
+	if (0 == strcmp(str, "WA_HORIZONTAL"))
+	{
+		return WA_HORIZONTAL;
+	}
+	else
+	if (0 == strcmp(str, "WA_LEFT"))
+	{
+		return WA_LEFT;
+	}
+	else
+	if (0 == strcmp(str, "WA_LOW"))
+	{
+		return WA_LOW;
+	}
+	else
+	if (0 == strcmp(str, "WA_RIGHT"))
+	{
+		return WA_RIGHT;
+	}
+	else
+	if (0 == strcmp(str, "WA_TOP"))
+	{
+		return WA_TOP;
+	}
+	else
+	if (0 == strcmp(str, "WA_VERTICAL"))
+	{
+		return WA_VERTICAL;
+	}
+	else
+	{
+		return -1;
+	}
+}
+
 void NcursesgetchFunction(Environment *theEnv, UDFContext *context, UDFValue *returnValue)
 {
 	int ch = getch();
-	const char *out = KeyToStr(ch);
+	returnValue->integerValue = CreateInteger(theEnv, ch);
+}
+
+void NcurseskeyToStrFunction(Environment *theEnv, UDFContext *context, UDFValue *returnValue)
+{
+	UDFValue theArg;
+	UDFNextArgument(context, INTEGER_BIT, &theArg);
+	if (theArg.header->type != INTEGER_TYPE)
+	{
+		WriteString(theEnv, STDERR, "ncurses-key-to-str: Argument must be an integer");
+		returnValue->lexemeValue = FalseSymbol(theEnv);
+		return;
+	}
+	const char *out = KeyToStr(theArg.integerValue->contents);
 	if (NULL == out)
 	{
-		returnValue->integerValue = CreateInteger(theEnv, ch);
+		returnValue->integerValue = CreateInteger(theEnv, theArg.integerValue->contents);
 	}
 	else
 	{
@@ -657,15 +794,93 @@ void NcursescurssetFunction(Environment *theEnv, UDFContext *context, UDFValue *
 }
 
 #define PARSE_CHTYPE_ARG(FUNCTION_NAME, VARIABLE_NAME, TH)\
-UDFNextArgument(context,SYMBOL_BIT,&theArg); \
-chtype VARIABLE_NAME; \
-if (theArg.header->type != SYMBOL_TYPE) \
+UDFNextArgument(context,INTEGER_BIT|MULTIFIELD_BIT|LEXEME_BITS,&theArg); \
+chtype VARIABLE_NAME = 0; \
+if (theArg.header->type == INTEGER_TYPE) \
+{ \
+	VARIABLE_NAME = (chtype) theArg.integerValue->contents; \
+} \
+else \
+if (theArg.header->type == MULTIFIELD_TYPE) \
+{ \
+	chtype chpart = 0, attributes = 0; \
+	if (theArg.multifieldValue->length > 0) \
+	{ \
+		if (theArg.multifieldValue->contents[0].header->type == INTEGER_TYPE) \
+		{ \
+			chpart = (chtype) theArg.multifieldValue->contents[0].integerValue->contents; \
+		} \
+		else \
+		if (theArg.multifieldValue->contents[0].header->type == SYMBOL_TYPE || theArg.multifieldValue->contents[0].header->type == STRING_TYPE) \
+		{ \
+			if (theArg.multifieldValue->contents[0].lexemeValue->contents[0] != '\0' && theArg.multifieldValue->contents[0].lexemeValue->contents[1] == '\0') \
+			{ \
+				chpart = (unsigned char) theArg.multifieldValue->contents[0].lexemeValue->contents[0]; \
+			} \
+			else \
+			if (ERR == (chpart = StrToACS(theArg.multifieldValue->contents[0].lexemeValue->contents))) \
+			{ \
+				WriteString(theEnv, STDERR, "ncurses-" #FUNCTION_NAME ": " #TH " arg must be a chtype\n"); \
+				returnValue->lexemeValue = FalseSymbol(theEnv); \
+				return; \
+			} \
+		} \
+		else \
+		{ \
+			WriteString(theEnv, STDERR, "ncurses-" #FUNCTION_NAME ": " #TH " arg must be a chtype\n"); \
+			returnValue->lexemeValue = FalseSymbol(theEnv); \
+			return; \
+		} \
+	} \
+	if (theArg.multifieldValue->length > 1) \
+	{ \
+		if (theArg.multifieldValue->contents[1].header->type == INTEGER_TYPE) \
+		{ \
+			attributes = (chtype) theArg.multifieldValue->contents[1].integerValue->contents; \
+		} \
+		else \
+		{ \
+			WriteString(theEnv, STDERR, "ncurses-" #FUNCTION_NAME ": " #TH " arg must be a chtype\n"); \
+			returnValue->lexemeValue = FalseSymbol(theEnv); \
+			return; \
+		} \
+	} \
+	VARIABLE_NAME =  chpart | attributes; \
+	if (theArg.multifieldValue->length > 2) \
+	{ \
+		if (theArg.multifieldValue->contents[2].header->type == INTEGER_TYPE) \
+		{ \
+			VARIABLE_NAME |= COLOR_PAIR(theArg.multifieldValue->contents[2].integerValue->contents); \
+		} \
+		else \
+		{ \
+			WriteString(theEnv, STDERR, "ncurses-" #FUNCTION_NAME ": " #TH " arg must be a chtype\n"); \
+			returnValue->lexemeValue = FalseSymbol(theEnv); \
+			return; \
+		} \
+	} \
+} \
+else \
+if (theArg.header->type == SYMBOL_TYPE) \
+{ \
+	if (theArg.lexemeValue->contents[0] != '\0' && theArg.lexemeValue->contents[1] == '\0') \
+	{ \
+		VARIABLE_NAME = (unsigned char) theArg.lexemeValue->contents[0]; \
+	} \
+	else \
+	if (ERR == (VARIABLE_NAME = StrToACS(theArg.lexemeValue->contents))) \
+	{ \
+		WriteString(theEnv, STDERR, "ncurses-" #FUNCTION_NAME ": " #TH " arg must be a chtype\n"); \
+		returnValue->lexemeValue = FalseSymbol(theEnv); \
+		return; \
+	} \
+} \
+else \
 { \
 	WriteString(theEnv, STDERR, "ncurses-" #FUNCTION_NAME ": " #TH " arg must be a chtype\n"); \
 	returnValue->lexemeValue = FalseSymbol(theEnv); \
 	return; \
-} \
-VARIABLE_NAME = StrToACS(theArg.lexemeValue->contents);
+}
 
 void NcursesborderFunction(Environment *theEnv, UDFContext *context, UDFValue *returnValue)
 {
@@ -799,7 +1014,228 @@ void NcursesmvwprintwFunction(Environment *theEnv, UDFContext *context, UDFValue
 		return;
 	}
 
-	HANDLE_OK_OR_ERR(mvwprintw, mvwprintw(window, y, x, "%s", theArg.lexemeValue->contents));
+	HANDLE_OK_OR_ERR(mvwprintw, mvwprintw(window, y, x, "%s", theArg.lexemeValue->contents))
+}
+
+void NcursesmoveFunction(Environment *theEnv, UDFContext *context, UDFValue *returnValue)
+{
+	UDFValue theArg;
+	// int move(int y, int x);
+	PARSE_INTEGER_ARG(move, x, first)
+	PARSE_INTEGER_ARG(move, y, second)
+
+	HANDLE_OK_OR_ERR(move, move(x, y))
+}
+
+void NcursesaddchFunction(Environment *theEnv, UDFContext *context, UDFValue *returnValue)
+{
+	UDFValue theArg;
+	// int addch(const chtype ch);
+	PARSE_CHTYPE_ARG(addch, ch, first)
+
+	HANDLE_OK_OR_ERR(addch, addch(ch))
+}
+
+void NcursesinchFunction(Environment *theEnv, UDFContext *context, UDFValue *returnValue)
+{
+	returnValue->integerValue = CreateInteger(theEnv, inch());
+}
+
+void ChtypeCharacterFunction(Environment *theEnv, UDFContext *context, UDFValue *returnValue)
+{
+	UDFValue theArg;
+	PARSE_CHTYPE_ARG(chtype-character, ch, first)
+	returnValue->integerValue = CreateInteger(theEnv, A_CHARTEXT & ch);
+}
+
+void ChtypeAttributesFunction(Environment *theEnv, UDFContext *context, UDFValue *returnValue)
+{
+	UDFValue theArg;
+	PARSE_CHTYPE_ARG(chtype-attributes, ch, first)
+	returnValue->integerValue = CreateInteger(theEnv, A_ATTRIBUTES & ch);
+}
+
+void ChtypeColorPairFunction(Environment *theEnv, UDFContext *context, UDFValue *returnValue)
+{
+	UDFValue theArg;
+	PARSE_CHTYPE_ARG(chtype-color-pair, ch, first)
+	returnValue->integerValue = CreateInteger(theEnv, PAIR_NUMBER(ch));
+}
+
+void NcursestimeoutFunction(Environment *theEnv, UDFContext *context, UDFValue *returnValue)
+{
+	UDFValue theArg;
+	// void timeout(int delay);
+	PARSE_INTEGER_ARG(timeout, delay, first)
+	
+	timeout(delay);
+	
+	returnValue->lexemeValue = TrueSymbol(theEnv);
+}
+
+void NcurseswtimeoutFunction(Environment *theEnv, UDFContext *context, UDFValue *returnValue)
+{
+	UDFValue theArg;
+	// void wtimeout(WINDOW * win, int delay);
+	PARSE_WINDOW_ARG(wtimeout)
+	PARSE_INTEGER_ARG(wtimeout, delay, second)
+	
+	wtimeout(window, delay);
+
+	returnValue->lexemeValue = TrueSymbol(theEnv);
+}
+
+void NcursesgetyxFunction(Environment *theEnv, UDFContext *context, UDFValue *returnValue)
+{
+	UDFValue theArg;
+	int x, y;
+	// void getyx(WINDOW *win, int y, int x);
+	PARSE_WINDOW_ARG(getyx)
+	
+	getyx(window, y, x);
+
+	MultifieldBuilder *mb = CreateMultifieldBuilder(theEnv, 2);
+	MBAppendInteger(mb, y);
+	MBAppendInteger(mb, x);
+	returnValue->multifieldValue = MBCreate(mb);
+	MBDispose(mb);
+}
+
+void NcursesgetmaxyxFunction(Environment *theEnv, UDFContext *context, UDFValue *returnValue)
+{
+	UDFValue theArg;
+	int x, y;
+	// void getmaxyx(WINDOW *win, int y, int x);
+	PARSE_WINDOW_ARG(getmaxyx)
+	
+	getmaxyx(window, y, x);
+
+	MultifieldBuilder *mb = CreateMultifieldBuilder(theEnv, 2);
+	MBAppendInteger(mb, y);
+	MBAppendInteger(mb, x);
+	returnValue->multifieldValue = MBCreate(mb);
+	MBDispose(mb);
+}
+
+void NcursesdelwinFunction(Environment *theEnv, UDFContext *context, UDFValue *returnValue)
+{
+	UDFValue theArg;
+	// int delwin(WINDOW * win);
+	PARSE_WINDOW_ARG(delwin)
+
+	HANDLE_OK_OR_ERR(delwin, delwin(window))
+}
+
+void NcursesattronFunction(Environment *theEnv, UDFContext *context, UDFValue *returnValue)
+{
+	UDFValue theArg;
+	int attr = -1, in;
+	while (UDFHasNextArgument(context))
+	{
+		UDFNextArgument(context,INTEGER_BIT | SYMBOL_BIT,&theArg);
+		if (theArg.header->type == INTEGER_TYPE)
+		{
+			if (attr == -1)
+			{
+				attr = theArg.integerValue->contents;
+			}
+			else
+			{
+				attr |= theArg.integerValue->contents;
+			}
+		}
+		else
+		if (theArg.header->type == SYMBOL_TYPE)
+		{
+			if (in = StrToAttr(theArg.lexemeValue->contents))
+			{	
+				if (attr == -1)
+				{
+					attr = in;
+				}
+				else
+				{
+					attr |= in;
+				}
+			}
+			else
+			{
+				WriteString(theEnv, STDERR, "ncurses-attron: Unrecognized attr ");
+				WriteString(theEnv, STDERR, theArg.lexemeValue->contents);
+				WriteString(theEnv, STDERR, "\n");
+				returnValue->lexemeValue = FalseSymbol(theEnv);
+				return;
+			}
+		}
+	}
+	if (attr > -1)
+	{
+		HANDLE_OK_OR_ERR(attron, attron(attr));
+		return;
+	}
+	WriteString(theEnv, STDERR, "ncurses-attron: Unrecognized attrs\n");
+	returnValue->lexemeValue = FalseSymbol(theEnv);
+}
+
+void NcursesattroffFunction(Environment *theEnv, UDFContext *context, UDFValue *returnValue)
+{
+	UDFValue theArg;
+	int attr = -1, in;
+	while (UDFHasNextArgument(context))
+	{
+		UDFNextArgument(context,INTEGER_BIT | SYMBOL_BIT,&theArg);
+		if (theArg.header->type == INTEGER_TYPE)
+		{
+			if (attr == -1)
+			{
+				attr = theArg.integerValue->contents;
+			}
+			else
+			{
+				attr |= theArg.integerValue->contents;
+			}
+		}
+		else
+		if (theArg.header->type == SYMBOL_TYPE)
+		{
+			if (in = StrToAttr(theArg.lexemeValue->contents))
+			{	
+				if (attr == -1)
+				{
+					attr = in;
+				}
+				else
+				{
+					attr |= in;
+				}
+			}
+			else
+			{
+				WriteString(theEnv, STDERR, "ncurses-attroff: Unrecognized attr ");
+				WriteString(theEnv, STDERR, theArg.lexemeValue->contents);
+				WriteString(theEnv, STDERR, "\n");
+				returnValue->lexemeValue = FalseSymbol(theEnv);
+				return;
+			}
+		}
+	}
+	if (attr > -1)
+	{
+		HANDLE_OK_OR_ERR(attroff, attroff(attr));
+		return;
+	}
+	WriteString(theEnv, STDERR, "ncurses-attroff: Unrecognized attrs\n");
+	returnValue->lexemeValue = FalseSymbol(theEnv);
+}
+
+void NcursescolsFunction(Environment *theEnv, UDFContext *context, UDFValue *returnValue)
+{
+	returnValue->integerValue = CreateInteger(theEnv, COLS);
+}
+
+void NcurseslinesFunction(Environment *theEnv, UDFContext *context, UDFValue *returnValue)
+{
+	returnValue->integerValue = CreateInteger(theEnv, LINES);
 }
 
 /*********************************************************/
@@ -814,6 +1250,7 @@ void NcursesmvwprintwFunction(Environment *theEnv, UDFContext *context, UDFValue
 #define ADD_UDF_HANDLE_OK_OR_ERR_FUNCTION(FUNCTION_NAME) \
 AddUDF(env,"ncurses-" #FUNCTION_NAME,"by",0,0,NULL,Ncurses##FUNCTION_NAME##Function,"Ncurses" #FUNCTION_NAME "Function",NULL);
 
+
 #define ADD_UDF_SET_OPTION(FUNCTION_NAME) \
 AddUDF(env,"ncurses-" #FUNCTION_NAME,"by",0,2,";ey;b",Ncurses##FUNCTION_NAME##Function,"Ncurses" #FUNCTION_NAME "Function",NULL);
 
@@ -825,6 +1262,7 @@ void UserFunctions(
 #endif
 	AddUDF(env,"ncurses-initscr","be",0,0,NULL,NcursesinitscrFunction,"NcursesinitscrFunction",NULL);
 
+	  ADD_UDF_HANDLE_OK_OR_ERR_FUNCTION(echo)
 	  ADD_UDF_HANDLE_OK_OR_ERR_FUNCTION(noecho)
 	  ADD_UDF_HANDLE_OK_OR_ERR_FUNCTION(cbreak)
 	  ADD_UDF_HANDLE_OK_OR_ERR_FUNCTION(clear)
@@ -832,21 +1270,45 @@ void UserFunctions(
 	  ADD_UDF_HANDLE_OK_OR_ERR_FUNCTION(endwin)
 	  ADD_UDF_HANDLE_OK_OR_ERR_FUNCTION(doupdate)
 
+	AddUDF(env,"ncurses-start-color","by",0,0,NULL,Ncursesstart_colorFunction,"Ncursesstart_colorFunction",NULL);
+
 	  ADD_UDF_SET_OPTION(keypad)
 	  ADD_UDF_SET_OPTION(leaveok)
 
 	AddUDF(env,"ncurses-curs-set","bly",1,1,";l",NcursescurssetFunction,"NcursescurssetFunction",NULL);
 
+	AddUDF(env,"ncurses-move","by",2,2,";l;l",NcursesmoveFunction,"NcursesmoveFunction",NULL);
+
 	AddUDF(env,"ncurses-mvprintw","by",3,3,";l;l;s",NcursesmvprintwFunction,"NcursesmvprintwFunction",NULL);
 	AddUDF(env,"ncurses-mvwprintw","by",4,4,";ey;l;l;s",NcursesmvwprintwFunction,"NcursesmvwprintwFunction",NULL);
 
-	AddUDF(env,"ncurses-getch","by",0,0,NULL,NcursesgetchFunction,"NcursesgetchFunction",NULL);
+	AddUDF(env,"ncurses-getch","bl",0,0,NULL,NcursesgetchFunction,"NcursesgetchFunction",NULL);
+	AddUDF(env,"ncurses-key-to-str","bly",1,1,";l",NcurseskeyToStrFunction,"NcurseskeyToStrFunction",NULL);
+	AddUDF(env,"ncurses-inch","l",0,0,NULL,NcursesinchFunction,"NcursesinchFunction",NULL);
 
 	AddUDF(env,"ncurses-border","b",8,8,"y",NcursesborderFunction,"NcursesborderFunction",NULL);
 	AddUDF(env,"ncurses-wborder","b",9,9,"y;ey",NcurseswborderFunction,"NcurseswborderFunction",NULL);
-	AddUDF(env,"ncurses-box","b",3,3,"y;ey",NcursesboxFunction,"NcursesboxFunction",NULL);
+	AddUDF(env,"ncurses-box","b",3,3,"ly;ey",NcursesboxFunction,"NcursesboxFunction",NULL);
 
 	AddUDF(env,"ncurses-newwin","b",4,4,"l",NcursesnewwinFunction,"NcursesnewwinFunction",NULL);
 	AddUDF(env,"ncurses-wclear","b",0,1,";ey",NcurseswclearFunction,"NcurseswclearFunction",NULL);
 	AddUDF(env,"ncurses-wrefresh","b",0,1,";ey",NcurseswrefreshFunction,"NcurseswrefreshFunction",NULL);
+
+	AddUDF(env,"ncurses-addch","by",1,1,";l",NcursesaddchFunction,"NcursesaddchFunction",NULL);
+
+	AddUDF(env,"ncurses-chtype-character","bl",1,1,";l",ChtypeCharacterFunction,"ChtypeCharacterFunction",NULL);
+	AddUDF(env,"ncurses-chtype-attributes","bl",1,1,";l",ChtypeAttributesFunction,"ChtypeAttributesFunction",NULL);
+	AddUDF(env,"ncurses-chtype-color-pair","bl",1,1,";l",ChtypeColorPairFunction,"ChtypeColorPairFunction",NULL);
+
+	AddUDF(env,"ncurses-timeout","b",1,1,";l",NcursestimeoutFunction,"NcursestimeoutFunction",NULL);
+	AddUDF(env,"ncurses-wtimeout","b",2,2,";ey;l",NcurseswtimeoutFunction,"NcurseswtimeoutFunction",NULL);
+	AddUDF(env,"ncurses-getyx","bm",1,1,";ey",NcursesgetyxFunction,"NcursesgetyxFunction",NULL);
+	AddUDF(env,"ncurses-getmaxyx","bm",1,1,";ey",NcursesgetmaxyxFunction,"NcursesgetmaxyxFunction",NULL);
+	AddUDF(env,"ncurses-delwin","b",1,1,";ey",NcursesdelwinFunction,"NcursesdelwinFunction",NULL);
+
+	AddUDF(env,"ncurses-attron","b",1,UNBOUNDED,"yl",NcursesattronFunction,"NcursesattronFunction",NULL);
+	AddUDF(env,"ncurses-attroff","b",1,UNBOUNDED,"yl",NcursesattroffFunction,"NcursesattroffFunction",NULL);
+
+	AddUDF(env,"ncurses-cols","l",0,0,NULL,NcursescolsFunction,"NcursescolsFunction",NULL);
+	AddUDF(env,"ncurses-lines","l",0,0,NULL,NcurseslinesFunction,"NcurseslinesFunction",NULL);
   }

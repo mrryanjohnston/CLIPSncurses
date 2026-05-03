@@ -32,7 +32,7 @@
 				"<")))
 
 	(ncurses-refresh)
-	(assert (key (ch (ncurses-getch)))))
+	(assert (key (ch (ncurses-key-to-str (ncurses-getch))))))
 
 (defrule move-down
 	?m <- (menu (index ?i) (items $?items))
@@ -52,7 +52,7 @@
 	?k <- (key (ch ?ch&~KEY_UP&~KEY_DOWN&~10))
 	=>
 	(retract ?k)
-	(assert (key (ch (ncurses-getch)))))
+	(assert (key (ch (ncurses-key-to-str (ncurses-getch))))))
 
 (defrule select-quit
 	(menu (index ?i) (items $?items))
