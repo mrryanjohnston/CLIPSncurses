@@ -18,6 +18,35 @@ in the `examples` dir by doing this:
 ./vendor/clips/clips -f2 examples/worms.bat
 ```
 
+### Which CLIPS
+
+`CLIPS_VERSION` selects the CLIPS source:
+
+```
+make                        # the 6.4.2 release tarball (the default)
+make CLIPS_VERSION=svn-6x   # branches/64x of the CLIPS Subversion repository
+make CLIPS_VERSION=svn-7x   # branches/70x
+```
+
+## Tests
+
+```
+make test
+```
+
+That builds, runs the suite in `tests/` against the build, and then runs
+every example in `examples/`, feeding each the keys in the `.keys` file
+beside it and checking that it reaches its own exit without writing to
+stderr.  `make test-suite` and `make test-examples` run one half, and
+`make test-all` runs the whole thing against all three CLIPS versions in
+turn, which is what CI does across three runners.
+
+ncurses draws on stdout and reads keys from stdin, so the suite is run
+through `tests/run.sh`: it sends the screen to a file,
+writes the suite's report to stderr, feeds a fixed sequence of key bytes on
+stdin, and pins the terminal to xterm at 24x80 so the positions, key codes
+and line-drawing characters asserted are the same on every machine.
+
 ## API
 
 ### `ncurses-initscr`

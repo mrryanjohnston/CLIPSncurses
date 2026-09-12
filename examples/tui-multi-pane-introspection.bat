@@ -175,7 +175,7 @@
 (defrule get-input
   (app (dirty FALSE))
   =>
-  (assert (key (ch (ncurses-getch)))))
+  (assert (key (ch (ncurses-key-to-str (ncurses-getch))))))
 
 ; ------------------------------------------------------------
 ; focus cycling
